@@ -1,7 +1,9 @@
+import Blog from "./pages/blog";
+
 function App() {
   return (
     <>
-      <p>Hello</p>
+      <Blog />
     </>
   );
 }
