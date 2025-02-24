@@ -1,15 +1,28 @@
-import { useDispatch, useSelector } from "react-redux";
+import { useSelector } from "react-redux";
 import PostItem from "../PostItem";
-import { RootState } from "@/redux/store";
+import { RootState, useAppDispatch } from "@/redux/store";
 import { Post } from "@/types/blog.type";
-import { deletePost, startEditingPost } from "@/pages/blog/blog.slice";
+import {
+  deletePost,
+  getPostList,
+  startEditingPost,
+} from "@/pages/blog/blog.slice";
+import { useEffect } from "react";
 
 const PostList = () => {
+  const dispatch = useAppDispatch();
+
+  useEffect(() => {
+    const promise = dispatch(getPostList());
+
+    return () => {
+      promise.abort();
+    };
+  }, [dispatch]);
+
   const postList = useSelector<RootState, Post[]>(
     (state) => state.blog.postList,
   );
-
-  const dispatch = useDispatch();
 
   const handleDelete = (postId: string) => {
     dispatch(deletePost(postId));

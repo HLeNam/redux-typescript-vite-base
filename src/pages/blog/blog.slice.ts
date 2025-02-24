@@ -1,13 +1,12 @@
 import {
-  // createAction,
-  // createReducer,
-  nanoid,
   createSlice,
   PayloadAction,
   current,
+  createAsyncThunk,
+  nanoid,
 } from "@reduxjs/toolkit";
 import { Post } from "@/types/blog.type";
-import { initialPostList } from "@/constants/blog";
+import http from "@/utils/http";
 
 interface BlogState {
   postList: Post[];
@@ -15,39 +14,14 @@ interface BlogState {
 }
 
 const initialState: BlogState = {
-  postList: initialPostList,
+  postList: [],
   editingPost: null,
 };
-
-// export const addPost = createAction(
-//   "blog/addPost",
-//   function (post: Omit<Post, "id">) {
-//     return {
-//       payload: {
-//         ...post,
-//         id: nanoid(),
-//       },
-//     };
-//   },
-// );
-
-// export const deletePost = createAction<string>("blog/deletePost");
-
-// export const startEditingPost = createAction<string>("blog/startEditingPost");
-
-// export const cancelEditingPost = createAction("blog/cancelEditingPost");
-
-// export const finishEditingPost = createAction<Post>("blog/finishEditingPost");
 
 const blogSlice = createSlice({
   name: "blog",
   initialState: initialState,
   reducers: {
-    deletePost: (state, action: PayloadAction<string>) => {
-      state.postList = state.postList.filter(
-        (post) => post.id !== action.payload,
-      );
-    },
     startEditingPost: (state, action: PayloadAction<string>) => {
       state.editingPost =
         state.postList.find((post) => post.id === action.payload) || null;
@@ -55,28 +29,49 @@ const blogSlice = createSlice({
     cancelEditingPost: (state) => {
       state.editingPost = null;
     },
-    finishEditingPost: (state, action: PayloadAction<Post>) => {
-      state.postList = state.postList.map((post) =>
-        post.id === action.payload.id ? action.payload : post,
-      );
-      state.editingPost = null;
-    },
-    addPost: {
-      reducer: (state, action: PayloadAction<Post>) => {
-        state.postList.push(action.payload);
-      },
-      prepare: (post: Omit<Post, "id">) => {
-        return {
-          payload: {
-            ...post,
-            id: nanoid(),
-          },
-        };
-      },
-    },
   },
   extraReducers: (builder) => {
     builder
+      .addCase(getPostList.pending, () => {
+        console.log("getPostList pending");
+      })
+      .addCase(getPostList.fulfilled, (state, action) => {
+        state.postList = action.payload;
+      })
+      .addCase(getPostList.rejected, (_, action) => {
+        console.log("getPostList rejected: ", action.error.message);
+      })
+      .addCase(addPost.pending, () => {
+        console.log("addPost pending");
+      })
+      .addCase(addPost.fulfilled, (state, action) => {
+        state.postList.push(action.payload);
+      })
+      .addCase(addPost.rejected, (_, action) => {
+        console.log("addPost rejected: ", action.error.message);
+      })
+      .addCase(updatePost.pending, () => {
+        console.log("updatePost pending");
+      })
+      .addCase(updatePost.fulfilled, (state, action) => {
+        state.postList = state.postList.map((post) =>
+          post.id === action.payload.id ? action.payload : post,
+        );
+      })
+      .addCase(updatePost.rejected, (_, action) => {
+        console.log("updatePost rejected: ", action.error.message);
+      })
+      .addCase(deletePost.pending, () => {
+        console.log("deletePost pending");
+      })
+      .addCase(deletePost.fulfilled, (state, action) => {
+        state.postList = state.postList.filter(
+          (post) => post.id !== action.payload,
+        );
+      })
+      .addCase(deletePost.rejected, (_, action) => {
+        console.log("deletePost rejected: ", action.error.message);
+      })
       .addMatcher(
         (action) => {
           return action.type.includes("cancel");
@@ -92,47 +87,57 @@ const blogSlice = createSlice({
   },
 });
 
-export const {
-  addPost,
-  deletePost,
-  startEditingPost,
-  cancelEditingPost,
-  finishEditingPost,
-} = blogSlice.actions;
+export const getPostList = createAsyncThunk(
+  "blog/getPostList",
+  async (_, thunkAPI) => {
+    const res = await http.get<Post[]>("/posts", {
+      signal: thunkAPI.signal,
+    });
+
+    return res.data;
+  },
+);
+
+export const addPost = createAsyncThunk(
+  "blog/addPost",
+  async (body: Omit<Post, "id">, thunkAPI) => {
+    const newPost = {
+      ...body,
+      id: nanoid(),
+    };
+
+    const res = await http.post<Post>("/posts", newPost, {
+      signal: thunkAPI.signal,
+    });
+
+    return res.data;
+  },
+);
+
+export const updatePost = createAsyncThunk(
+  "blog/updatePost",
+  async (body: Post, thunkAPI) => {
+    const res = await http.put<Post>(`/posts/${body.id}`, body, {
+      signal: thunkAPI.signal,
+    });
+
+    return res.data;
+  },
+);
+
+export const deletePost = createAsyncThunk(
+  "blog/deletePost",
+  async (postId: string, thunkAPI) => {
+    await http.delete(`/posts/${postId}`, {
+      signal: thunkAPI.signal,
+    });
+
+    return postId;
+  },
+);
+
+export const { startEditingPost, cancelEditingPost } = blogSlice.actions;
 
 const blogReducer = blogSlice.reducer;
-
-// const blogReducer = createReducer(initialState, (builder) => {
-//   builder.addCase(addPost, (state, action) => {
-//     state.postList.push(action.payload);
-//   });
-//   builder.addCase(deletePost, (state, action) => {
-//     state.postList = state.postList.filter(
-//       (post) => post.id !== action.payload,
-//     );
-//   });
-//   builder.addCase(startEditingPost, (state, action) => {
-//     state.editingPost =
-//       state.postList.find((post) => post.id === action.payload) || null;
-//   });
-//   builder.addCase(cancelEditingPost, (state) => {
-//     state.editingPost = null;
-//   });
-//   builder.addCase(finishEditingPost, (state, action) => {
-//     state.postList = state.postList.map((post) =>
-//       post.id === action.payload.id ? action.payload : post,
-//     );
-//     state.editingPost = null;
-//   });
-//   builder.addMatcher(
-//     (action) => {
-//       return action.type.includes("cancel");
-//     },
-//     (state) => {
-//       state.editingPost = null;
-//       console.log("cancelEditingPost");
-//     },
-//   );
-// });
 
 export default blogReducer;
