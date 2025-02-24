@@ -5,7 +5,7 @@ import {
   addPost,
   cancelEditingPost,
   finishEditingPost,
-} from "@/pages/blog/blog.reducer";
+} from "@/pages/blog/blog.slice";
 import { RootState } from "@/redux/store";
 
 const initialState: Post = {
