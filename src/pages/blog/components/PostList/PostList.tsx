@@ -8,9 +8,12 @@ import {
   startEditingPost,
 } from "@/pages/blog/blog.slice";
 import { useEffect } from "react";
+import SkeletonPost from "../SkeletonPost";
 
 const PostList = () => {
   const dispatch = useAppDispatch();
+
+  const loading = useSelector((state: RootState) => state.blog.loading);
 
   useEffect(() => {
     const promise = dispatch(getPostList());
@@ -45,14 +48,21 @@ const PostList = () => {
           </p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2 md:gap-6 lg:grid-cols-2 xl:grid-cols-2 xl:gap-8">
-          {postList.map((post) => (
-            <PostItem
-              key={post.id}
-              post={post}
-              handleDelete={handleDelete}
-              handleStartEditing={handleStartEditing}
-            />
-          ))}
+          {loading && (
+            <>
+              <SkeletonPost />
+              <SkeletonPost />
+            </>
+          )}
+          {!loading &&
+            postList.map((post) => (
+              <PostItem
+                key={post.id}
+                post={post}
+                handleDelete={handleDelete}
+                handleStartEditing={handleStartEditing}
+              />
+            ))}
         </div>
       </div>
     </div>

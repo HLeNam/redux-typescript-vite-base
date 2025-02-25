@@ -4,18 +4,29 @@ import {
   current,
   createAsyncThunk,
   nanoid,
+  AsyncThunk,
 } from "@reduxjs/toolkit";
 import { Post } from "@/types/blog.type";
 import http from "@/utils/http";
 
+type GenericAsyncThunk = AsyncThunk<unknown, unknown, { rejectValue: string }>;
+
+type PendingAction = ReturnType<GenericAsyncThunk["pending"]>;
+type RejectedAction = ReturnType<GenericAsyncThunk["rejected"]>;
+type FulfilledAction = ReturnType<GenericAsyncThunk["fulfilled"]>;
+
 interface BlogState {
   postList: Post[];
   editingPost: Post | null;
+  loading: boolean;
+  currentRequestId: undefined | string;
 }
 
 const initialState: BlogState = {
   postList: [],
   editingPost: null,
+  loading: false,
+  currentRequestId: undefined,
 };
 
 const blogSlice = createSlice({
@@ -72,13 +83,30 @@ const blogSlice = createSlice({
       .addCase(deletePost.rejected, (_, action) => {
         console.log("deletePost rejected: ", action.error.message);
       })
-      .addMatcher(
+      .addMatcher<PendingAction>(
         (action) => {
-          return action.type.includes("cancel");
+          return action.type.endsWith("/pending");
         },
-        (state) => {
-          state.editingPost = null;
-          console.log("cancelEditingPost");
+        (state, action) => {
+          state.loading = true;
+          state.currentRequestId = action.meta.requestId;
+        },
+      )
+      .addMatcher<RejectedAction | FulfilledAction>(
+        (action) => {
+          return (
+            action.type.endsWith("/rejected") ||
+            action.type.endsWith("/fulfilled")
+          );
+        },
+        (state, action) => {
+          if (
+            state.loading &&
+            state.currentRequestId === action.meta.requestId
+          ) {
+            state.loading = false;
+            state.currentRequestId = undefined;
+          }
         },
       )
       .addDefaultCase((state) => {
@@ -117,11 +145,20 @@ export const addPost = createAsyncThunk(
 export const updatePost = createAsyncThunk(
   "blog/updatePost",
   async (body: Post, thunkAPI) => {
-    const res = await http.put<Post>(`/posts/${body.id}`, body, {
-      signal: thunkAPI.signal,
-    });
+    try {
+      const res = await http.put<Post>(`/posts/${body.id}`, body, {
+        signal: thunkAPI.signal,
+      });
 
-    return res.data;
+      return res.data;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
+      if (error.name === "AxiosError" && error.response?.status === 422) {
+        return thunkAPI.rejectWithValue(error.response.data);
+      }
+
+      throw error;
+    }
   },
 );
 
